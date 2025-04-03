@@ -1,6 +1,7 @@
 package main
 
 import (
+	"game_of_life/game"
 	"github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -9,8 +10,8 @@ func main() {
 	rl.InitWindow(screenSize, screenSize, "game of life")
 	rl.SetTargetFPS(60)
 
-	game := NewGame(128)
-	blockSize := int32(screenSize / game.Size)
+	g := game.NewGame(128)
+	blockSize := int32(screenSize / g.Size)
 
 	setup := true
 	oneFrame := false
@@ -36,15 +37,15 @@ func main() {
 
 		if rl.IsKeyPressed(rl.KeyC) {
 			setup = true
-			game.Clear()
+			g.Clear()
 		}
 
 		if rl.IsKeyPressed(rl.KeyF5) && setup {
-			game.Save()
+			g.Save()
 			displayCounter = 100
 			displayMessage = "State Saved"
 		} else if rl.IsKeyDown(rl.KeyF6) && setup {
-			game.Load()
+			g.Load()
 			displayCounter = 100
 			displayMessage = "State Loaded"
 		}
@@ -55,25 +56,25 @@ func main() {
 		}
 
 		if rl.IsMouseButtonDown(rl.MouseButtonRight) && !paintStarted {
-			blockX, blockY := MouseToBlockCoord(blockSize, game.Size)
+			blockX, blockY := MouseToBlockCoord(blockSize, g.Size)
 
 			paintStarted = true
-			paintMode = !game.cells[blockX][blockY]
+			paintMode = !g.Cells[blockX][blockY]
 		} else if rl.IsMouseButtonReleased(rl.MouseButtonRight) {
 			paintStarted = false
 		}
 
 		if !setup || oneFrame {
-			GameLogic(game)
+			GameLogic(g)
 		} else if rl.IsMouseButtonPressed(rl.MouseButtonLeft) {
-			blockX, blockY := MouseToBlockCoord(blockSize, game.Size)
-			game.cells[blockX][blockY] = !game.cells[blockX][blockY]
+			blockX, blockY := MouseToBlockCoord(blockSize, g.Size)
+			g.Cells[blockX][blockY] = !g.Cells[blockX][blockY]
 		} else if rl.IsMouseButtonDown(rl.MouseButtonRight) {
-			blockX, blockY := MouseToBlockCoord(blockSize, game.Size)
-			game.cells[blockX][blockY] = paintMode
+			blockX, blockY := MouseToBlockCoord(blockSize, g.Size)
+			g.Cells[blockX][blockY] = paintMode
 		}
 
-		DrawGame(game, blockSize)
+		DrawGame(g, blockSize)
 
 		oneFrame = false
 
@@ -83,62 +84,16 @@ func main() {
 	rl.CloseWindow()
 }
 
-func NewGame(size int) *Game {
-	c := make([][]bool, size)
-	for i := range size {
-		c[i] = make([]bool, size)
-	}
-
-	var buffer = make([][]bool, size)
-	for i := range size {
-		buffer[i] = make([]bool, size)
-	}
-
-	var save = make([][]bool, size)
-	for i := range size {
-		save[i] = make([]bool, size)
-	}
-
-	for i := range size {
-		for j := range size {
-			c[i][j] = false
-			buffer[i][j] = false
-			save[i][j] = false
-		}
-	}
-
-	c[61][61] = true
-	c[62][61] = true
-	c[62][60] = true
-	c[62][62] = true
-	c[63][62] = true
-
-	return &Game{cells: c, Generation: 0, Size: int32(size), buffer: buffer, save: save}
-}
-
-type Game struct {
-	cells      [][]bool
-	buffer     [][]bool
-	save       [][]bool
-	Size       int32
-	Generation int
-}
-
-type Coord struct {
-	X int32
-	Y int32
-}
-
-func GameLogic(game *Game) {
-	for i := int32(0); i < game.Size; i++ {
-		for j := int32(0); j < game.Size; j++ {
-			alive := game.cells[i][j]
+func GameLogic(g *game.Game) {
+	for i := int32(0); i < g.Size; i++ {
+		for j := int32(0); j < g.Size; j++ {
+			alive := g.Cells[i][j]
 			liveNeighbors := 0
 
-			neighbors := Neighbors(i, j, game.Size)
+			neighbors := Neighbors(i, j, g.Size)
 			for _, n := range neighbors {
 				// print("{", n.X, ", ", n.Y, "}, ")
-				if game.cells[n.X][n.Y] {
+				if g.Cells[n.X][n.Y] {
 					liveNeighbors++
 				}
 			}
@@ -155,20 +110,25 @@ func GameLogic(game *Game) {
 				}
 			}
 
-			game.buffer[i][j] = alive
+			g.Buffer[i][j] = alive
 		}
 	}
 
-	for i := int32(0); i < game.Size; i++ {
-		for j := int32(0); j < game.Size; j++ {
-			game.cells[i][j] = game.buffer[i][j]
+	for i := int32(0); i < g.Size; i++ {
+		for j := int32(0); j < g.Size; j++ {
+			g.Cells[i][j] = g.Buffer[i][j]
 		}
 	}
 
-	game.Generation = game.Generation + 1
+	g.Generation = g.Generation + 1
 }
 
 var Neighbor_Offsets = [8][2]int32{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}
+
+type Coord struct {
+	X int32
+	Y int32
+}
 
 func Neighbors(i int32, j int32, size int32) []Coord {
 	neighbors := make([]Coord, 8)
@@ -183,40 +143,15 @@ func Neighbors(i int32, j int32, size int32) []Coord {
 	return neighbors
 }
 
-func DrawGame(game *Game, blockSize int32) {
+func DrawGame(g *game.Game, blockSize int32) {
 
-	for i := int32(0); i < game.Size; i++ {
-		for j := int32(0); j < game.Size; j++ {
-			if game.cells[i][j] {
+	for i := int32(0); i < g.Size; i++ {
+		for j := int32(0); j < g.Size; j++ {
+			if g.Cells[i][j] {
 				rl.DrawRectangle(i*blockSize, j*blockSize, blockSize, blockSize, rl.RayWhite)
 			}
 		}
 	}
-}
-
-func (g *Game) Clear() {
-	for i := range g.Size {
-		for k := range g.Size {
-			g.cells[i][k] = false
-		}
-	}
-}
-
-func (g *Game) Save() {
-	for i := range g.Size {
-		for j := range g.Size {
-			g.save[i][j] = g.cells[i][j]
-		}
-	}
-}
-
-func (g *Game) Load() {
-	for i := range g.Size {
-		for j := range g.Size {
-			g.cells[i][j] = g.save[i][j]
-		}
-	}
-
 }
 
 func MouseToBlockCoord(blockSize int32, gameSize int32) (int32, int32) {
